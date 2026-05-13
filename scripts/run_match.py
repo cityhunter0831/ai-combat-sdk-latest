@@ -5,6 +5,18 @@ AI Combat Match Runner - 행동트리 기반 매치 실행 스크립트
 """
 
 import sys
+
+# Python 3.14 필수 (SDK 내부 .pyd 바이너리가 cp314 전용)
+if sys.version_info[:2] != (3, 14):
+    print("❌ 오류: 본 SDK는 Python 3.14 가 필요합니다.")
+    print(f"   현재 버전: Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
+    print("")
+    print("해결 방법 (Windows PowerShell):")
+    print("   py -3.14 -m venv .venv")
+    print("   .venv\\Scripts\\activate")
+    print("   pip install -r requirements.txt")
+    sys.exit(1)
+
 import argparse
 import yaml
 import time

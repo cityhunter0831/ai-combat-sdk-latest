@@ -2,11 +2,13 @@
 
 **AI 전투기 대결 챌린지 - 참여자 개발 키트**
 
+> 📦 **SDK 버전**: `v0.10.2`
+
 행동트리(Behavior Tree) 기반으로 AI 전투기를 설계하고, 다른 참여자의 AI와 대결하세요!
 
 ---
 
-## � 시스템 요구사항
+## 💻 시스템 요구사항
 
 - **Python 3.14**: https://www.python.org/downloads/ (설치 시 "Add Python to PATH" 체크)
 - **Git**: https://git-scm.com/download/win
@@ -31,11 +33,16 @@ cd ai-combat-sdk
 
 ### 3단계: 환경 설정
 
+> ⚠️ **반드시 Python 3.14로 venv를 생성하세요.** SDK 내부의 `.pyd` 바이너리는 `cp314` 전용이라 Python 3.13 이하에서는 `ImportError`가 발생합니다.
+
 ```powershell
-python -m venv .venv
+py -3.14 -m venv .venv
 .venv\Scripts\activate
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
+
+설치 후 `python --version` 으로 `Python 3.14.x` 가 출력되는지 확인하세요.
 
 ### 4단계: VSCode에서 열기
 
@@ -110,6 +117,7 @@ tau = obs.get("tau_deg", 0.0)   # -180°~180°
 
 ```yaml
 name: "my_agent"
+version: "1.0.0"
 description: "나의 첫 번째 AI 전투기"
 
 tree:
@@ -175,8 +183,10 @@ python scripts/run_match.py --agent1 my_agent --agent2 eagle1 --rounds 5
 |---------|------|------|
 | 1 | 상대 체력(HP)이 0이 됨 | 승리 |
 | 2 | **Hard Deck 위반** (고도 < 1,000ft) | **즉시 패배** |
-| 3 | 시간 종료 (1,500 스텝 = 300초) 후 체력 우위 | 체력 많은 쪽 승리 |
+| 3 | 시간 종료 (6,000 시뮬 스텝 = 300초, 시뮬 20Hz) 후 체력 우위 | 체력 많은 쪽 승리 |
 | 4 | 시간 종료 후 체력 동점 | 무승부 |
+
+> 시뮬레이션은 **20Hz (1스텝 = 0.05초)** 로 진행됩니다. 행동트리의 **action 선택 tick은 10Hz (0.1초 주기, 시뮬 2스텝마다 1회)**, condition 노드 subtick은 매 시뮬 스텝(20Hz)마다 호출됩니다. `run_match.py` 출력의 `스텝: N / 6000` 은 시뮬 스텝 기준입니다.
 
 ### 데미지 시스템 (Gun WEZ 기반)
 
@@ -187,7 +197,7 @@ python scripts/run_match.py --agent1 my_agent --agent2 eagle1 --rounds 5
 | **ATA (조준 각도)** | < 12° (기수 앞 ±12° 이내) |
 | **거리** | 500ft ~ 3,000ft |
 
-- **데미지**: 최대 25 HP/s × 거리계수 × 각도계수 × 0.2s (스텝당)
+- **데미지**: 최대 25 HP/s × 거리계수 × 각도계수 × 0.05s (시뮬 스텝당, 20Hz)
 - **초기 체력**: 100 HP
 - **전략적 의미**: ATA를 0°에 가깝게(각도계수 최대), 거리를 500ft에 가깝게(거리계수 최대) 유지할수록 빠르게 격추 가능
 
@@ -444,7 +454,7 @@ ai-combat-sdk/
 
 ### 동작 원리
 
-행동트리는 **매 스텝(0.2초)마다 한 번** 실행됩니다. 루트 노드부터 순서대로 평가하며 각 노드는 `SUCCESS` 또는 `FAILURE`를 반환합니다.
+행동트리의 action 선택 tick은 **0.1초마다 한 번**(10Hz, 시뮬 2스텝마다 1회) 실행됩니다. 루트 노드부터 순서대로 평가하며 각 노드는 `SUCCESS` 또는 `FAILURE`를 반환합니다. Condition 노드의 `update()`는 별도로 매 시뮬 스텝(20Hz)마다 호출되어 짧은 이벤트를 놓치지 않습니다.
 
 ```
 Selector (OR): 자식 중 하나라도 SUCCESS → SUCCESS, 모두 FAILURE → FAILURE
