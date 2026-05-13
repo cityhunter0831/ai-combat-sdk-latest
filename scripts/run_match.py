@@ -15,8 +15,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.match.runner import BehaviorTreeMatch
-from examples.full_logger_callback import create_full_logger
+from src.match.runner import BehaviorTreeMatch  # noqa: E402
 
 # 한국 시간대 (KST = UTC+9)
 KST = timezone(timedelta(hours=9))
@@ -107,7 +106,6 @@ def run_match(
     max_steps: int = None,
     verbose: bool = None,
     log_csv: str = None,
-    callback_log: str = None,
 ) -> list:
     """두 행동트리 간 매치 실행
     
@@ -119,7 +117,6 @@ def run_match(
         max_steps: 최대 스텝 (config 기본값 사용)
         verbose: 상세 출력 여부 (config 기본값 사용)
         log_csv: CSV 로그 파일 경로 (None이면 저장 안 함)
-        callback_log: 콜백 로그 파일 경로 (None이면 콘솔만 출력)
         
     Returns:
         list: 매치 결과 객체 리스트
@@ -190,17 +187,6 @@ def run_match(
             else:
                 csv_path = str(log_dir / f"{timestamp}_{agent1_name}_vs_{agent2_name}.csv")
         
-        # 콜백 로거 설정 (타임스탬프 + 에이전트명 포함)
-        step_callback = None
-        if callback_log:
-            callback_dir = Path(callback_log)
-            callback_dir.mkdir(parents=True, exist_ok=True)
-            if rounds > 1:
-                callback_path = str(callback_dir / f"{timestamp}_{agent1_name}_vs_{agent2_name}_callback_round{round_num}.csv")
-            else:
-                callback_path = str(callback_dir / f"{timestamp}_{agent1_name}_vs_{agent2_name}_callback.csv")
-            step_callback = create_full_logger(callback_path)
-        
         match = BehaviorTreeMatch(
             tree1_file=tree1,
             tree2_file=tree2,
@@ -209,7 +195,6 @@ def run_match(
             tree1_name=agent1_name,
             tree2_name=agent2_name,
             log_csv=csv_path,
-            step_callback=step_callback,
         )
 
         print(f"{agent1_name} vs {agent2_name}")
@@ -288,8 +273,6 @@ def main():
   
 로깅 예시:
   python run_match.py --agent1 eagle1 --agent2 simple --log-csv
-  python run_match.py --agent1 eagle1 --agent2 simple --callback-log
-  python run_match.py --agent1 eagle1 --agent2 simple --log-csv --callback-log
         """
     )
     
@@ -305,8 +288,6 @@ def main():
     parser.add_argument('--quiet', action='store_true', help='상세 출력 비활성화')
     parser.add_argument('--log-csv', type=str, nargs='?', const='logs', default=None,
                         help='CSV 로그 저장 폴더 (기본값: logs) - 파일명은 자동 생성')
-    parser.add_argument('--callback-log', type=str, nargs='?', const='logs', default=None,
-                        help='콜백 로그 저장 폴더 (기본값: logs) - 파일명은 자동 생성')
     
     args = parser.parse_args()
     
@@ -318,7 +299,6 @@ def main():
         max_steps=args.max_steps,
         verbose=not args.quiet,
         log_csv=args.log_csv,
-        callback_log=args.callback_log,
     )
 
 

@@ -30,10 +30,10 @@ F-16 전투기 2대가 공중에서 1대1로 싸우는 시뮬레이션에서, **
 |---------|------|------|
 | 1 | 상대 HP를 0으로 만듦 | **승리** |
 | 2 | **Hard Deck 위반** (고도 < 1,000ft) | **즉시 패배** |
-| 3 | 시간 종료 (1,500 스텝 = 300초) 후 HP 우위 | **승리** |
+| 3 | 시간 종료 (6,000 스텝 = 300초) 후 HP 우위 | **승리** |
 | 4 | 시간 종료 후 HP 동일 | **무승부** |
 
-> ⚠️ **주의**: 매치와 토너먼트 모두 **1,500 스텝(300초)**로 실행됩니다. (`tournament_config.yaml`의 `max_steps: 1500`)
+> ⚠️ **주의**: 매치와 토너먼트 모두 **300초(5분)** 로 실행됩니다. 20 Hz 기준 6,000 스텝. (`max_steps: 0` = 자동 계산)
 
 ### 1.3 피해(데미지)를 주는 방법 — WEZ (Weapon Engagement Zone)
 
@@ -578,21 +578,15 @@ my_agent vs simple
 매치 실행 시 **로깅 옵션**을 사용하면 전투 데이터를 수집하여 분석할 수 있습니다:
 
 ```bash
-# 실시간 콘솔 출력 + 요약 로그 저장
-python scripts/run_match.py --agent1 my_agent --agent2 simple --callback-log
-
-# 전체 데이터 CSV 로그 저장
+# 전체 데이터 CSV 로그 저장 (45개 컬럼)
 python scripts/run_match.py --agent1 my_agent --agent2 simple --log-csv
-
-# 🔥 둘 다 사용 (추천!)
-python scripts/run_match.py --agent1 my_agent --agent2 ace --log-csv --callback-log
 ```
 
 **로그 파일 위치**: `logs/YYYYMMDD_HHMMSS_agent1_vs_agent2.csv`
 
-**콘솔 실시간 출력 예시** (`--callback-log` 사용 시):
+**콘솔 실시간 출력 예시** (verbose 모드):
 ```
-[   0] A0100 | BFM=HABFM | HP=100.0/100.0 | Dmg= 0.0 | WEZ=False | Dist=3298m ATA= 90.0deg | Node=LeadPursuit
+[   1] A0100 | BFM=HABFM | HP=100.0/100.0 | Dmg= 0.0 | WEZ=False | Dist=3298m ATA= 90.0deg | Node=LeadPursuit
 [  50] A0100 | BFM=OBFM  | HP=100.0/ 95.3 | Dmg= 4.7 | WEZ=True  | Dist= 850m ATA=  3.2deg | Node=PNAttack
 [ 100] A0100 | BFM=DBFM  | HP= 92.1/100.0 | Dmg= 0.0 | WEZ=False | Dist=1200m ATA= 65.0deg | Node=BreakTurn
 ```
@@ -603,12 +597,12 @@ python scripts/run_match.py --agent1 my_agent --agent2 ace --log-csv --callback-
 
 ```bash
 # 3라운드씩 여러 상대와 테스트 (로그 수집)
-python scripts/run_match.py --agent1 my_agent --agent2 simple --rounds 3 --callback-log
-python scripts/run_match.py --agent1 my_agent --agent2 aggressive --rounds 3 --callback-log
-python scripts/run_match.py --agent1 my_agent --agent2 defensive --rounds 3 --callback-log
-python scripts/run_match.py --agent1 my_agent --agent2 ace --rounds 3 --callback-log
-python scripts/run_match.py --agent1 my_agent --agent2 eagle1 --rounds 3 --callback-log
-python scripts/run_match.py --agent1 my_agent --agent2 viper1 --rounds 3 --callback-log
+python scripts/run_match.py --agent1 my_agent --agent2 simple --rounds 3 --log-csv
+python scripts/run_match.py --agent1 my_agent --agent2 aggressive --rounds 3 --log-csv
+python scripts/run_match.py --agent1 my_agent --agent2 defensive --rounds 3 --log-csv
+python scripts/run_match.py --agent1 my_agent --agent2 ace --rounds 3 --log-csv
+python scripts/run_match.py --agent1 my_agent --agent2 eagle1 --rounds 3 --log-csv
+python scripts/run_match.py --agent1 my_agent --agent2 viper1 --rounds 3 --log-csv
 ```
 
 **상대 난이도 (약한 순):**
@@ -1361,10 +1355,10 @@ LOSS = -5.0 + (our_hp - their_hp) / 100.0 * 2.0
 cat logs/opt_results.json
 
 # 2. 최고 성능 후보 상세 테스트
-python tools/test_agent.py logs/temp_bt/_temp_opt_12345.yaml --all-opponents --rounds 10 --callback-log
+python tools/test_agent.py logs/temp_bt/_temp_opt_12345.yaml --all-opponents --rounds 10 --log-csv
 
 # 3. 특정 상대와 심층 분석
-python scripts/run_match.py --agent1 logs/temp_bt/_temp_opt_12345.yaml --agent2 ace --rounds 5 --log-csv --callback-log
+python scripts/run_match.py --agent1 logs/temp_bt/_temp_opt_12345.yaml --agent2 ace --rounds 5 --log-csv
 
 # 4. 마음에 들면 복사하여 사용
 cp logs/temp_bt/_temp_opt_12345.yaml submissions/my_agent/my_agent.yaml
@@ -1392,7 +1386,7 @@ cat logs/opt_results.json
 cat logs/param_analysis_*.txt
 
 # 3. 상위 후보 상세 분석 (이때 로깅 사용)
-python tools/test_agent.py logs/temp_bt/_temp_opt_BEST.yaml --all-opponents --rounds 10 --log-csv analysis --callback-log analysis
+python tools/test_agent.py logs/temp_bt/_temp_opt_BEST.yaml --all-opponents --rounds 10 --log-csv analysis
 ```
 
 ### 10.2 에이전트 일괄 테스트 (test_agent.py)
@@ -1408,11 +1402,8 @@ python tools/test_agent.py my_agent --opponent ace --rounds 3
 # 모든 상대와 자동 테스트 (6종)
 python tools/test_agent.py my_agent --all-opponents --rounds 3
 
-# 로깅 포함 (추천!)
-python tools/test_agent.py my_agent --all-opponents --rounds 3 --callback-log
-
-# CSV + 콜백 로깅 모두 사용
-python tools/test_agent.py my_agent --all-opponents --rounds 3 --log-csv --callback-log
+# CSV 로깅 포함 (추천!)
+python tools/test_agent.py my_agent --all-opponents --rounds 3 --log-csv
 ```
 
 #### 주요 옵션
@@ -1423,7 +1414,6 @@ python tools/test_agent.py my_agent --all-opponents --rounds 3 --log-csv --callb
 | `--all-opponents` | 6종 상대 모두와 대전 | `--all-opponents` |
 | `--rounds` | 라운드 수 | `--rounds 5` |
 | `--log-csv` | CSV 로그 저장 | `--log-csv` 또는 `--log-csv my_logs` |
-| `--callback-log` | 콜백 로그 저장 (실시간 출력) | `--callback-log` |
 | `--verbose` | 상세 출력 | `--verbose` |
 
 #### 출력 예시
@@ -1432,14 +1422,14 @@ python tools/test_agent.py my_agent --all-opponents --rounds 3 --log-csv --callb
 🎮 에이전트 테스트 시작
    에이전트: my_agent
    라운드: 3
-   콜백 로그: logs/
+   CSV 로그: logs/
 
 ============================================================
 🎯 vs simple
 ============================================================
 
 --- Round 1/3 ---
-[   0] A0100 | BFM=HABFM | HP=100.0/100.0 | ...
+[   1] A0100 | BFM=HABFM | HP=100.0/100.0 | ...
 ✅ 승리!
 
 --- Round 2/3 ---
@@ -1475,7 +1465,7 @@ vs viper1      : 1W / 1D / 1L
 #### 장점
 
 ✅ **자동화**: 6종 상대와 자동으로 대전
-✅ **로깅 통합**: `--callback-log`로 실시간 모니터링 + 파일 저장
+✅ **로깅 통합**: `--log-csv`로 CSV 저장, 콘솔에 실시간 출력
 ✅ **통계 요약**: 상대별 전적 및 전체 승률 자동 계산
 ✅ **파이프라이닝 불필요**: 결과가 콘솔에 바로 출력되므로 `> output.txt` 필요 없음
 
@@ -1485,13 +1475,13 @@ vs viper1      : 1W / 1D / 1L
 
 ```bash
 # 1. 현재 BT 성능 측정 (로그 포함)
-python tools/test_agent.py my_agent --all-opponents --rounds 5 --callback-log baseline
+python tools/test_agent.py my_agent --all-opponents --rounds 5 --log-csv baseline
 
 # 2. 약점 분석 (로그 파일 확인)
 # baseline/ 폴더의 CSV 파일들을 Python/Excel로 분석
 
 # 3. 파라미터 수정 후 재테스트
-python tools/test_agent.py my_agent --all-opponents --rounds 5 --callback-log improved
+python tools/test_agent.py my_agent --all-opponents --rounds 5 --log-csv improved
 
 # 4. 결과 비교
 # baseline/ vs improved/ 폴더의 로그 비교
@@ -1504,7 +1494,7 @@ python tools/test_agent.py my_agent --all-opponents --rounds 5 --callback-log im
 python tools/bt_optimizer.py --candidates 100 --workers 15
 
 # 2. 최고 후보 상세 분석
-python scripts/run_match.py --agent1 logs/temp_bt/_temp_opt_BEST.yaml --agent2 ace --log-csv --callback-log
+python scripts/run_match.py --agent1 logs/temp_bt/_temp_opt_BEST.yaml --agent2 ace --log-csv
 
 # 3. 로그 분석 후 수동 조정
 # (YAML 파일 직접 편집)
@@ -1517,7 +1507,7 @@ python tools/test_agent.py submissions/my_agent/my_agent.yaml --rounds 10
 
 ```bash
 # 1. 모든 상대와 대전하며 상세 로그 수집 (한 번에!)
-python tools/test_agent.py my_bt --all-opponents --rounds 5 --log-csv analysis --callback-log analysis
+python tools/test_agent.py my_bt --all-opponents --rounds 5 --log-csv analysis
 
 # 2. 로그 분석하여 상대별 약점 파악
 # analysis/ 폴더의 CSV 파일들을 Python/Excel로 분석
@@ -1526,7 +1516,7 @@ python tools/test_agent.py my_bt --all-opponents --rounds 5 --log-csv analysis -
 # (예: ace 상대로는 에너지 관리 강화, aggressive 상대로는 방어 강화)
 
 # 4. 전체 재검증
-python tools/test_agent.py my_agent --all-opponents --rounds 10 --callback-log
+python tools/test_agent.py my_agent --all-opponents --rounds 10 --log-csv
 ```
 
 ### 10.4 성능 분석 팁
@@ -1847,8 +1837,9 @@ CSV와 ACMI는 **둘 다 매 env.step마다 1행/1프레임**으로 기록된다
 
 | 출처 | 값 갱신 빈도 | CSV 컬럼 / ACMI 필드 |
 |------|-------------|---------------------|
-| JSBSim 물리 상태 (env.step 내부 3 sim step의 마지막 값) | 20 Hz | 위치(lat/lon/alt), 자세(roll/pitch/yaw), `ego_vc_kts`, `ego_vx_kts`, `ego_vy_kts`, `ego_vz_kts` |
-| CombatGeometry 계산 (env.step마다) | 20 Hz | `distance_ft`, `ata_deg`, `aa_deg`, `hca_deg`, `tau_deg`, `relative_bearing_deg`, `closure_rate_kts`, `turn_rate_degs` |
+| JSBSim 물리 상태 | 20 Hz | `step`(1~N), `sim_time_sec`, `ego_altitude_ft`, `ego_vc_kts`, `heading_deg`, `roll_deg`, `pitch_deg` |
+| JSBSim 서보 응답 | 20 Hz | `servo_aileron`, `servo_elevator`, `servo_rudder` (실제 조종면 위치) |
+| CombatGeometry 계산 (env.step마다) | 20 Hz | `distance_ft`, `ata_deg`, `aa_deg`, `hca_deg`, `tau_deg`, `closure_rate_kts`, `turn_rate_degs` |
 | BT blackboard services (tick_conditions에서 갱신) | 20 Hz | `/Distance_ft`, `/CurrentRoll_deg`, `/ClosureRate_kts`, `/In39Line`, `ps_fts`, `bfm_situation` |
 | BT 액션 출력 (BT tick에서만 갱신) | **10 Hz** (2행마다 같은 값 반복) | `action_altitude`, `action_heading`, `action_velocity` |
 | 저수준 제어 (RNN 출력, RNN tick에서만 갱신) | **5 Hz** (4행마다 같은 값 반복) | `aileron`, `elevator`, `rudder`, `throttle`, ACMI의 `RollControlInput` 등 |
@@ -1862,11 +1853,11 @@ import pandas as pd
 df = pd.read_csv('logs/match.csv')
 my = df[df['agent_id'] == 'A0100']
 
-# BT 결정 시점만 (10 Hz): action 값이 새로 갱신된 행만 추리고 싶을 때
-bt_ticks = my[my['step'] % 2 == 0]
+# BT 결정 시점만 (10 Hz): action 값이 새로 갱신된 행만 (step은 1-indexed)
+bt_ticks = my[my['step'] % 2 == 1]
 
 # RNN 추론 시점만 (5 Hz): 저수준 제어가 새로 갱신된 행만
-rnn_ticks = my[my['step'] % 4 == 0]
+rnn_ticks = my[my['step'] % 4 == 1]
 
 # 액션 노드 전환 시점만
 node_changes = my[my['active_node'] != my['active_node'].shift()]
@@ -1937,7 +1928,7 @@ class ATABelowThresholdCounter(BaseCondition):
 | 항목 | 값 | 비고 |
 |------|-----|------|
 | **Hard Deck** | 1000ft (304.8m) | `HARD_DECK_M = feet_to_meters(1000)` |
-| **최대 스텝** | 6,000 스텝 = 300초 | `bt_vs_bt.yaml` max_steps: 6000 (env.step 20 Hz × 300 s) |
+| **최대 스텝** | 6,000 스텝 = 300초 | `max_steps: 0` (자동, env.time_interval 기반 5분 산출) |
 | **WEZ 거리** | 500~3000ft | 152~914m |
 | **WEZ 각도** | ATA < 12° | 실제 데미지 발생 조건 (ATA 0°에 가까울수록 데미지 증가) |
 | **기본 DPS** | 25 HP/s | 거리·각도 계수 적용 |
