@@ -199,15 +199,15 @@ def main():
     elif args.command == "leaderboard":
         leaderboard = manager.get_leaderboard()
         print("\n[LEADERBOARD]")
-        header = f"{'#':<4} {'Team':<18} {'Win':<5} {'Draw':<6} {'Loss':<6} {'Pts':<5} {'Elo':<8} {'Avg HP':<8}"
+        header = f"{'#':<4} {'Team':<18} {'Win':<5} {'Draw':<6} {'Loss':<6} {'Pts':<5} {'Avg HP':<8}"
         sep = "-" * len(header)
         print("=" * len(header))
         print(header)
         print(sep)
-        
+
         for rank, team in enumerate(leaderboard, 1):
             points = team.wins * 3 + team.draws
-            print(f"{rank:<4} {team.name:<18} {team.wins:<5} {team.draws:<6} {team.losses:<6} {points:<5} {team.elo_rating:<8.1f} {team.avg_hp_remaining:<8.1f}")
+            print(f"{rank:<4} {team.name:<18} {team.wins:<5} {team.draws:<6} {team.losses:<6} {points:<5} {team.avg_hp_remaining:<8.1f}")
         
         print("=" * len(header))
         print()

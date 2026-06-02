@@ -14,11 +14,6 @@ rounds:
     type: "round_robin"
     description: "모든 팀이 서로 한 번씩 대전"
 
-# Elo 점수 설정
-elo:
-  initial_rating: 1000.0
-  k_factor: 32.0        # 변동 폭 (높을수록 점수 변화 큼)
-
 # 매치 설정
 match:
   config_name: "1v1/NoWeapon/bt_vs_bt"

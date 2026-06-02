@@ -2,7 +2,7 @@
 
 **AI 전투기 대결 챌린지 - 참여자 개발 키트**
 
-> 📦 **SDK 버전**: `v0.11.0.2`
+> 📦 **SDK 버전**: `v0.12.0.1`
 
 행동트리(Behavior Tree) 기반으로 AI 전투기를 설계하고, 다른 참여자의 AI와 대결하세요!
 
@@ -113,10 +113,14 @@ tau = obs.get("tau_deg", 0.0)   # -180°~180°
 
 ## 📖 문서
 
-- **[docs/GUIDE.md](docs/GUIDE.md)** - 첫 에이전트 만들기, 테스트, 전략 개발
-- **[docs/NODE_REFERENCE.md](docs/NODE_REFERENCE.md)** - 전체 노드 레퍼런스
-- **[docs/BLACKBOARD_REFERENCE.md](docs/BLACKBOARD_REFERENCE.md)** - 관측값 키 전체 레퍼런스 (단위·부호 규약)
-- **[docs/VSCODE_SETUP.md](docs/VSCODE_SETUP.md)** - VSCode 환경 설정
+| 문서 | 내용 |
+|---|---|
+| **[docs/RULEBOOK.md](docs/RULEBOOK.md)** | 📕 **공식 룰북** — 매치 규칙·승패 판정·정보 공개 정책·랭킹·결정론 (모든 참가자 필독) |
+| **[docs/GUIDE.md](docs/GUIDE.md)** | 첫 에이전트 만들기, 테스트, 전략 개발 |
+| **[docs/NODE_REFERENCE.md](docs/NODE_REFERENCE.md)** | 전체 노드 레퍼런스 |
+| **[docs/BLACKBOARD_REFERENCE.md](docs/BLACKBOARD_REFERENCE.md)** | 관측값 키 전체 레퍼런스 (단위·부호 규약) |
+| **[docs/CHANGELOG_2026.md](docs/CHANGELOG_2026.md)** | 2026 경진대회 플랫폼 변경 이력 |
+| **[docs/VSCODE_SETUP.md](docs/VSCODE_SETUP.md)** | VSCode 환경 설정 |
 
 ---
 
@@ -184,36 +188,53 @@ python scripts/run_match.py --agent1 my_agent --agent2 eagle1 --rounds 5
 
 ---
 
-## 🏁 대회 규칙 및 승패 조건
+## 🏁 대회 규칙 요약
 
-### 승패 판정 (우선순위 순)
+> 📕 **전체 룰북은 [docs/RULEBOOK.md](docs/RULEBOOK.md)** — 본 섹션은 핵심 요약. 정확한 임계값/우선순위/엣지 케이스는 룰북이 단일 진실의 출처.
 
-| 우선순위 | 조건 | 결과 |
-|---------|------|------|
-| 1 | 상대 체력(HP)이 0이 됨 | 승리 |
-| 2 | **Hard Deck 위반** (고도 < 1,000ft) | **즉시 패배** |
-| 3 | 시간 종료 (6,000 시뮬 스텝 = 300초, 시뮬 20Hz) 후 체력 우위 | 체력 많은 쪽 승리 |
-| 4 | 시간 종료 후 체력 동점 | 무승부 |
+### 승패 판정 (우선순위 — 위가 먼저)
 
-> 시뮬레이션은 **20Hz (1스텝 = 0.05초)** 로 진행됩니다. 행동트리의 **action 선택 tick은 10Hz (0.1초 주기, 시뮬 2스텝마다 1회)**, condition 노드 subtick은 매 시뮬 스텝(20Hz)마다 호출됩니다. `run_match.py` 출력의 `스텝: N / 6000` 은 시뮬 스텝 기준입니다.
+| # | 사유 | 결과 |
+|---|------|------|
+| 1 | **Hard Deck 위반** (고도 < 1,000 ft) | 위반자 즉시 패배 |
+| 2 | **비행 안전 위반** — 9 G·5초 / 스핀 360°/s·3초 / 실속 <100 kts·10초 누적 | 위반자 즉시 패배 |
+| 3 | 상대 HP ≤ 0 | 승리 |
+| 4 | BT 실행 예외 | 위반자 DISQUALIFY |
+| 5 | Wall-clock 60초 초과 (JSBSim hang 안전장치) | 무승부 |
+| 6 | 시뮬 시간 종료 (300초) 후 HP 우위 | HP 많은 쪽 승리 / 동률이면 무승부 |
 
-### 데미지 시스템 (Gun WEZ 기반)
+**시간 계층**: 시뮬 20 Hz (1스텝 = 0.05초), **BT action tick 10 Hz**, RNN 5 Hz. `run_match.py`의 `스텝: N / 6000`은 시뮬 스텝.
 
-내 기체가 아래 두 조건을 **동시에** 만족하면 상대에게 데미지가 누적됩니다:
+### 데미지 (Gun WEZ)
 
 | 조건 | 값 |
 |------|-----|
-| **ATA (조준 각도)** | < 12° (기수 앞 ±12° 이내) |
-| **거리** | 500ft ~ 3,000ft |
+| ATA (조준 각도) | < 12° |
+| 거리 | 500 ft ~ 3,000 ft |
+| 최대 DPS | 25 HP/s × 거리계수 × 각도계수 |
 
-- **데미지**: 최대 25 HP/s × 거리계수 × 각도계수 × 0.05s (시뮬 스텝당, 20Hz)
-- **초기 체력**: 100 HP
-- **전략적 의미**: ATA를 0°에 가깝게(각도계수 최대), 거리를 500ft에 가깝게(거리계수 최대) 유지할수록 빠르게 격추 가능
+ATA 0°·거리 500ft에 가까울수록 효율 최대. 초기 HP 100.
 
-### 토너먼트 순위
+### BT 관측 정책 (정보 비대칭 차단)
 
-- **승점**: 승 3점, 무 1점, 패 0점
-- **동점 시**: Elo 점수로 구분 (초기 1000, K-factor 32)
+룰북 §4.3 — **적 HP·적이 받은 데미지는 BT에 노출되지 않는다.**
+적 상태는 `in_wez`/`enm_in_wez` + 교전 기하(ATA/AA/거리 등)로만 추정.
+
+| 관측 가능 | 관측 불가 |
+|---|---|
+| `ego_health`, `ego_damage_dealt`, `ego_damage_received`, `in_wez`, `enm_in_wez` | ❌ `enm_health`, `enm_damage_*` |
+
+### 매치 결정론
+
+같은 (BT pair, match.id) → 항상 같은 결과. 운영자가 의심 매치를 동일 시드로 재실행해 검증 가능. **BT 파일을 매치 사후 수정하면 감사에서 즉시 적발됨.**
+
+### 토너먼트 순위 (3-키 정렬)
+
+1. **승점** (승 3 / 무 1 / 패 0)
+2. **평균 잔여 HP** (매치 수 다른 팀 간 공정 비교)
+3. (2팀 동률 시 별도) **직접 대결** — 운영자 수동 적용
+
+예선은 round-robin, 결승은 표준 시딩(1vN, 2vN-1) single-elimination.
 
 ---
 
@@ -309,13 +330,12 @@ side_flag   = obs.get("side_flag", 0)             # -1/0/1
 #### AA (Aspect Angle) — 종횡비각
 
 **개념**: 적 기준으로 내가 어느 위치에 있는지를 나타내는 각도.  
-적의 속도 벡터(`v_t`)와 역-LOS 벡터(`−ρ_a`, 적→아군 방향) 사이 각도를 180°에서 뺀 값.
+적의 꼬리(`−v_t`)와 적→아군 LOS(`−ρ_a`) 사이 각도. 표준 BFM 교범 정의를 따른다.
 
 ```
-수식:
-  ρ_t = −ρ_a               (역-LOS 벡터: 적→아군)
-  ε   = arccos( v_t · ρ_t / (|v_t| × |ρ_t|) )
-  AA  = 180° − ε
+수식 (combat_geometry.aa_deg와 동일):
+  AA = arccos( v_t · ρ_a / (|v_t| × |ρ_a|) )
+     = arccos( (−v_t) · (−ρ_a) / (|v_t| × |ρ_a|) )
 
 해석:
   0°   = 내가 적의 정후방(6시) → 가장 유리한 공격 위치

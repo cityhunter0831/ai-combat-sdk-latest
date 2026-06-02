@@ -26,14 +26,37 @@ F-16 전투기 2대가 공중에서 1대1로 싸우는 시뮬레이션에서, **
 
 ### 1.2 승패 조건
 
+매 스텝 단일 판정 — 위가 먼저:
+
 | 우선순위 | 조건 | 결과 |
 |---------|------|------|
-| 1 | 상대 HP를 0으로 만듦 | **승리** |
-| 2 | **Hard Deck 위반** (고도 < 1,000ft) | **즉시 패배** |
-| 3 | 시간 종료 (6,000 스텝 = 300초) 후 HP 우위 | **승리** |
-| 4 | 시간 종료 후 HP 동일 | **무승부** |
+| 1 | **Hard Deck 위반** (고도 < 1,000 ft) | 위반자 즉시 패배 |
+| 2 | **비행 안전 위반** (9 G·5s / spin·3s / stall·10s 누적) | 위반자 즉시 패배 |
+| 3 | 상대 HP ≤ 0 | 승리 |
+| 4 | BT 실행 예외 | 위반자 DISQUALIFY |
+| 5 | Wall-clock 60s 초과 | 무승부 (안전장치) |
+| 6 | 시간 종료 + HP 우위 | HP 많은 쪽 승리 |
+| 6′ | 시간 종료 + HP 동일 | 무승부 |
 
-> ⚠️ **주의**: 매치와 토너먼트 모두 **300초(5분)** 로 실행됩니다. 20 Hz 기준 6,000 스텝. (`max_steps: 0` = 자동 계산)
+> ⚠️ **매치 시뮬 시간**: 300초 (20 Hz 기준 6,000 스텝, `max_steps: 0` = 자동). **실제 시간 상한**: 60초 (JSBSim hang 안전장치).
+
+> 📘 **전체 룰북**: 비행 안전 임계값·정보 비공개 정책·결정론·랭킹 등 상세는 [RULEBOOK.md](RULEBOOK.md) 참조.
+
+### 1.2.1 BT가 관측 가능한 매치 상태 (정보 비공개 정책)
+
+룰북 §4.3에 따라 **적의 HP/입은 데미지는 BT에 노출되지 않는다.** BT는 자기 중심 관측과 교전 기하로만 적 상태를 추정해야 한다.
+
+| 노출 | 키 | 설명 |
+|---|---|---|
+| ✅ | `ego_health` | 자기 현재 HP |
+| ✅ | `ego_damage_dealt` | 자기가 가한 누적 데미지 |
+| ✅ | `ego_damage_received` | 자기가 받은 누적 데미지 |
+| ✅ | `in_wez` | 자기가 적을 WEZ에 잡고 있음 |
+| ✅ | `enm_in_wez` | 적이 자기를 WEZ에 잡고 있음 (위협 신호) |
+| ❌ | `enm_health` | **노출 안 됨** — BT observation에서 제거됨 |
+| ❌ | `enm_damage_*` | **노출 안 됨** |
+
+이 외에 교전 기하(`ata_deg`, `aa_deg`, `distance_ft`, `closure_rate_kts` 등)와 BFM 분류는 모두 노출. CSV/ACMI 로그(운영자 사후 분석용)에는 `enm_health` 등이 여전히 기록되지만, 그건 BT가 실시간으로 보는 채널이 아니다.
 
 ### 1.3 피해(데미지)를 주는 방법 — WEZ (Weapon Engagement Zone)
 
@@ -1659,8 +1682,12 @@ CSV와 ACMI는 **둘 다 매 env.step마다 1행/1프레임**으로 기록된다
 | BT 액션 출력 (BT tick에서만 갱신) | **10 Hz** (2행마다 같은 값 반복) | `action_altitude`, `action_heading`, `action_velocity` |
 | 저수준 제어 (RNN 출력, RNN tick에서만 갱신) | **5 Hz** (4행마다 같은 값 반복) | `aileron`, `elevator`, `rudder`, `throttle`, ACMI의 `RollControlInput` 등 |
 | 활성 BT 노드 (BT tick에서만 갱신) | **10 Hz** | `active_node`, `active_nodes_path` |
-| WEZ 판정 / 데미지 / HP | 20 Hz | `in_wez`, `enm_in_wez`, `ego_health`, `enm_health`, `ego_damage_dealt`, `enm_damage_dealt` |
-| 보상 | 20 Hz | `reward` |
+| WEZ 판정 / 데미지 / HP | 20 Hz | `in_wez`, `enm_in_wez`, `ego_health`, `enm_health`†, `ego_damage_dealt`, `enm_damage_dealt`† |
+| 보상 | 20 Hz | `reward` (RL 비활성 — 항상 0)‡ |
+
+> † **참가자 주의**: `enm_health`/`enm_damage_dealt`는 CSV/ACMI(운영자 사후 분석용)에만 기록된다. **BT가 실시간 관측하는 blackboard에는 노출되지 않는다** (§1.2.1).
+>
+> ‡ RL 학습 미사용으로 `reward` 컬럼은 0 고정. 매치 결과는 §1.2 판정으로만 결정.
 
 분석 시 필터링 팁:
 ```python

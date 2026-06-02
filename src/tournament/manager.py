@@ -1,7 +1,7 @@
 import logging
 import yaml
 import json
-from typing import List, Dict
+from typing import List, Dict, Optional
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 
@@ -145,7 +145,6 @@ class TournamentManager:
             team.wins = 0
             team.draws = 0
             team.losses = 0
-            team.elo_rating = self.config.get('elo', {}).get('initial_rating', 1000.0)
             team.total_hp_remaining = 0.0
         
         # new_replays.json 파일 삭제
@@ -290,14 +289,16 @@ class TournamentManager:
         try:
             # 실제 매치 실행
             from src.match.runner import BehaviorTreeMatch
-            
+            from src.match.seeding import derive_seed
+
             game_match = BehaviorTreeMatch(
                 tree1_file=agent1_path, # 준비된 경로 사용
                 tree2_file=agent2_path,
                 config_name=self.config.get('match', {}).get('config_name', '1v1/NoWeapon/bt_vs_bt'),
                 max_steps=self.config.get('match', {}).get('max_steps', 2000),
                 tree1_name=team1.name,
-                tree2_name=team2.name
+                tree2_name=team2.name,
+                seed=derive_seed(match.id),
             )
             
             # 매치 실행 (verbose=False로 로그 최소화)
@@ -337,51 +338,20 @@ class TournamentManager:
             match.status = MatchStatus.ERROR
             match.completed_at = datetime.now(KST) # 오류 발생 시각 기록
             
-    @staticmethod
-    def _calc_elo(rating_a: float, rating_b: float, score_a: float, k: float = 32.0) -> tuple:
-        """Elo 점수 계산
-        
-        Args:
-            rating_a: A의 현재 Elo
-            rating_b: B의 현재 Elo
-            score_a: A의 실제 점수 (1=승, 0.5=무, 0=패)
-            k: K-factor (변동 폭, 기본 32)
-            
-        Returns:
-            (new_rating_a, new_rating_b) 튜플
-        """
-        expected_a = 1.0 / (1.0 + 10 ** ((rating_b - rating_a) / 400.0))
-        expected_b = 1.0 - expected_a
-        new_a = rating_a + k * (score_a - expected_a)
-        new_b = rating_b + k * ((1.0 - score_a) - expected_b)
-        return round(new_a, 2), round(new_b, 2)
-
     def _update_team_stats(self, match: Match, result: MatchResult):
-        """경기 결과에 따른 팀 통계 및 Elo 점수 업데이트"""
+        """경기 결과에 따른 팀 통계 업데이트 (승/무/패, 잔여 HP 누적)."""
         t1 = self.teams[match.team1_id]
         t2 = self.teams[match.team2_id]
-        
+
         if result.winner_id == t1.id:
             t1.wins += 1
             t2.losses += 1
-            score_t1 = 1.0
         elif result.winner_id == t2.id:
             t2.wins += 1
             t1.losses += 1
-            score_t1 = 0.0
         else:
             t1.draws += 1
             t2.draws += 1
-            score_t1 = 0.5
-        
-        # Elo 업데이트
-        k = self.config.get('elo', {}).get('k_factor', 32.0)
-        t1.elo_rating, t2.elo_rating = self._calc_elo(
-            t1.elo_rating, t2.elo_rating, score_t1, k
-        )
-        logger.info(
-            f"Elo 업데이트: {t1.name} {t1.elo_rating:+.1f} / {t2.name} {t2.elo_rating:+.1f}"
-        )
 
         # 잔여 HP 누적 (평균 HP 산정용)
         scores = result.scores
@@ -400,9 +370,45 @@ class TournamentManager:
         logger.info(f"새 리플레이 파일 목록 저장: {len(self.new_replay_files)}개")
             
     def get_leaderboard(self) -> List[Team]:
-        """순위 반환 (승점제: 승3 무1 패0, 동점 시 Elo 우선)"""
+        """순위 반환 (룰북 정의 우선순위)
+
+        정렬 키 (상위가 먼저):
+          1. 승점 (승 × 3 + 무 × 1)
+          2. 평균 잔여 HP (총 잔여 HP / 매치 수) — 매치 수가 다른 팀 간 공정 비교
+
+        주의: 직접 대결(head-to-head) 결과는 sort_key로는 결정 불가하므로
+        2팀 동률 시 별도 `head_to_head_winner()`로 수동 적용한다.
+        """
         def sort_key(t: Team):
             points = t.wins * 3 + t.draws * 1
-            return (points, t.elo_rating)
+            return (points, t.avg_hp_remaining)
         return sorted(self.teams.values(), key=sort_key, reverse=True)
+
+    def head_to_head_winner(self, team_a_id: str, team_b_id: str) -> Optional[str]:
+        """두 팀의 직접 대결 결과를 누적 승점으로 비교 → 우세 팀 ID 반환.
+
+        2팀 동률 시 룰북상 2순위 tiebreaker로 사용 (평균 HP보다 위).
+        승점 동률이면 None (무승부).
+        """
+        a_pts = 0
+        b_pts = 0
+        for m in self.matches:
+            if m.status != MatchStatus.COMPLETED or m.result is None:
+                continue
+            pair = {m.team1_id, m.team2_id}
+            if pair != {team_a_id, team_b_id}:
+                continue
+            w = m.result.winner_id
+            if w == team_a_id:
+                a_pts += 3
+            elif w == team_b_id:
+                b_pts += 3
+            else:
+                a_pts += 1
+                b_pts += 1
+        if a_pts > b_pts:
+            return team_a_id
+        if b_pts > a_pts:
+            return team_b_id
+        return None
 

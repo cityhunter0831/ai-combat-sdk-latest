@@ -1,22 +1,53 @@
-# 매치 규칙 설정
-# 사용자가 수정 가능한 대전 규칙
+# 매치 규칙 설정 (참조용)
+#
+# 본 yaml은 운영자가 매치 규칙을 한눈에 보는 참조 문서이며,
+# 실제 우선순위·임계값은 src/match/judge.py 와 src/control/flight_safety_monitor.py 가
+# 단일 진실의 출처(SSoT)다. 변경 시 코드와 함께 갱신해야 한다.
+# 공식 룰북: docs/RULEBOOK.md
+#
+# 시간 계층 (확정, 2026-05 A/B 검증):
+#   - JSBSim 물리 적분: 60 Hz (sim_freq=60)
+#   - env.step / 저수준 action 입력: 20 Hz (agent_interaction_steps=3)
+#   - BT action 선택 tick: 10 Hz
+#   - RNN(저수준 정책) 추론: 5 Hz (사전학습 모델 분포 보존)
+# 상세: docs/BT_TICK_RATE_ANALYSIS.md §10
 
 match:
   # 시간 제한
-  max_steps: 1500           # 최대 스텝 수 (5분 @ 5Hz)
-  time_limit_seconds: 300   # 5분
-  
+  max_steps: 6000              # 최대 시뮬 스텝 (5분 @ 20 Hz env.step)
+  time_limit_seconds: 300      # 시뮬 시간 5분
+  wall_clock_timeout_seconds: 60   # 매치 실제 시간 상한 (JSBSim/BT hang 안전장치)
+
   # 체력 시스템
-  initial_health: 100.0     # 초기 체력 (HP)
-  
-  # 승리 조건
+  initial_health: 100.0        # 초기 체력 (HP)
+
+  # 승리 조건 — 매 스텝 단일 판정. 위가 우선.
+  # 상세는 docs/RULEBOOK.md §8 참조.
   victory_conditions:
-    - type: "health_zero"   # 상대 체력 0
+    - type: "hard_deck"          # 고도 < 1,000 ft → 위반자 패배
       priority: 1
-    - type: "hard_deck"     # 상대 Hard Deck 위반
+    - type: "flight_safety"      # OVERLOAD(9G·5s) / SPIN(360°/s·3s) / STALL(<100kts·10s)
       priority: 2
-    - type: "health_advantage"  # 시간 종료 시 체력 우위
+    - type: "health_zero"        # 상대 HP ≤ 0 → 승리
       priority: 3
+    - type: "disqualify"         # BT 실행 예외 → 위반자 실격
+      priority: 4
+    - type: "wall_clock_timeout" # 매치 실제 시간 60s 초과 → 무승부 (안전장치)
+      priority: 5
+    - type: "health_advantage"   # 시뮬 시간 종료 + HP 우위 → 승리
+      priority: 6
+
+# 비행 안전 임계값 (참조용 — 실제 값은 src/control/flight_safety_monitor.py)
+flight_safety:
+  overload:
+    g_limit: 9.0
+    accumulated_seconds: 5.0
+  spin:
+    roll_rate_deg_per_sec: 360.0
+    accumulated_seconds: 3.0
+  stall:
+    cas_below_kts: 100.0
+    accumulated_seconds: 10.0
 
 # 초기 조건
 initial_conditions:

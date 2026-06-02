@@ -100,6 +100,8 @@ class BehaviorTreeMatch:
         tree2_name: Optional[str] = None,
         step_callback: Optional[Callable] = None,
         log_csv: Optional[str] = None,
+        seed: Optional[int] = None,
+        wall_clock_timeout_sec: Optional[float] = 60.0,
     ):
         """
         Args:
@@ -114,6 +116,10 @@ class BehaviorTreeMatch:
                                    reward, health, active_nodes, bfm_situation)
             log_csv: CSV 로그 파일 경로 (선택, None이면 저장 안 함)
                 예: "logs/match_log.csv"
+            seed: 결정론적 매치를 위한 시드. 같은 (tree pair, seed)는 같은 결과를 보장.
+                  None이면 비결정론 (개발/디버깅 편의용).
+            wall_clock_timeout_sec: 매치당 실제 시간 상한(초). JSBSim/BT hang으로부터
+                  매치를 강제 종료시킨다. None이면 비활성. 기본 60초.
         """
         self.tree1_file = tree1_file
         self.tree2_file = tree2_file
@@ -123,6 +129,8 @@ class BehaviorTreeMatch:
         self.tree2_name = tree2_name
         self.step_callback = step_callback
         self.log_csv = log_csv
+        self.seed = seed
+        self.wall_clock_timeout_sec = wall_clock_timeout_sec
 
     def run(
         self,
@@ -266,6 +274,8 @@ class BehaviorTreeMatch:
             tree1_name=self.tree1_name,
             tree2_name=self.tree2_name,
             step_hook=_step_hook if (csv_writer is not None or self.step_callback is not None) else None,
+            seed=self.seed,
+            wall_clock_timeout_sec=self.wall_clock_timeout_sec,
         )
 
         try:

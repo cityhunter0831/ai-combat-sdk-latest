@@ -14,7 +14,9 @@ logger = logging.getLogger(__name__)
 
 class MatchPhase(Enum):
     QUALIFICATION = "qualification"  # 예선 (리그)
+    QUARTERFINALS = "quarterfinals"  # 8강
     SEMIFINALS = "semifinals"        # 4강
+    THIRD_PLACE = "third_place"      # 3·4위전
     FINALS = "finals"                # 결승
     TEST = "test"                    # 테스트
 
@@ -29,7 +31,6 @@ class Team:
     id: str
     name: str
     submission_path: str  # YAML 파일 경로
-    elo_rating: float = 1000.0
     wins: int = 0
     losses: int = 0
     draws: int = 0

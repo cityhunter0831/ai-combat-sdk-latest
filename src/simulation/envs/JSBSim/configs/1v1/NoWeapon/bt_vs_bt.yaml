@@ -42,19 +42,9 @@ aircraft_configs: {
 # (lontitude, latitude, altitude)
 battle_field_center: [120.0, 60.0, 0.0]
 
-# reward config (WEZ 기반 조정)
-PostureReward_scale: 100.0
-PostureReward_potential: true
-PostureReward_orientation_version: v2
-PostureReward_range_version: v3
-PostureReward_target_dist: 0.5  # 500m (WEZ 중심: 152-914m)
-
-AltitudeReward_safe_altitude: 1.5   # 1500m
-AltitudeReward_danger_altitude: 0.5 # 500m (Hard Deck 근처)
-AltitudeReward_Kv: 0.5
-
-EventDrivenReward_scale: 1
-EventDrivenReward_potential: true
+# reward config: BT 기반 경진대회는 RL 학습을 사용하지 않으므로 reward 함수 등록 없음.
+# (SingleCombatTask.reward_functions = [], 매 스텝 reward = 0.0)
+# 매치 결과는 judge가 HP / Hard Deck / 비행 안전(9G·스핀·실속) / 시간 기준으로 결정한다.
 
 # WEZ (Weapon Engagement Zone) 정보
 # - 기축선 중심 2도 원뿔
