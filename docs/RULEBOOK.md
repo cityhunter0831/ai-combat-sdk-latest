@@ -42,6 +42,11 @@
 
 세 주파수는 정수배 관계라 위상 어긋남 없음. RNN은 PPO 사전학습된 정책으로, 매치 중 학습되지 않는다 (추론만).
 
+> **(참고) 선택적 Classical PD 제어기**: 명령 계층은 기본값이 위 RNN이나, 평가·연구용으로
+> `AICOMBAT_CONTROLLER=classical` 설정 시 RNN을 우회하고 PD 제어기([classical_controller.py](../src/control/classical_controller.py))를
+> 사용할 수 있다. 공식 매치는 기본(RNN)으로 운영하며, BT가 연속 maneuver를 출력하면(`set_maneuver`)
+> 이 PD 경로가 더 정밀히 추종한다. 자세히는 [제어기정리.md](제어기정리.md) Slide 3.
+
 ---
 
 ## 4. 행동 트리(BT) 인터페이스
@@ -242,10 +247,13 @@ RNN 정책은 사전학습 모델로 추론만 사용.
 
 ---
 
-## 14. 변경 이력 (2026-05 업데이트)
+## 14. 변경 이력 (2026-05~06 업데이트)
 
 | 항목 | 변경 |
 |---|---|
+| 신규 BT 노드 | 조건 `AspectAngleAbove/Below`·`AltGapAbove/Below`, 액션 `VerticalLead`·`OneCircleFight`/`TwoCircleFight`·`OvershootAvoidance` (2026-06) |
+| 선택적 Classical PD 제어기 | `AICOMBAT_CONTROLLER=classical` 로 RNN 우회 가능 (§3, 평가·연구용) (2026-06) |
+| Tactical Maneuver 출력 | BT가 연속 maneuver 리스트를 출력하는 `set_maneuver()` 인터페이스 (2026-06) |
 | 비행 안전 규정 | OVERLOAD/SPIN/STALL 누적 판정 신규 도입 (§6) |
 | 적 정보 노출 | enm_health 등 3개 채널 제거 (§4.3) |
 | 매치 결정론 | match.id 기반 시드 도입, np_random.shuffle 제거 (§10) |
@@ -271,4 +279,6 @@ RNN 정책은 사전학습 모델로 추론만 사용.
 | 결승 브라켓 | `src/tournament/bracket.py` |
 | 감사 도구 | `src/tournament/audit.py`, `scripts/audit_match.py` |
 | 매치 설정 | `src/simulation/envs/JSBSim/configs/1v1/NoWeapon/bt_vs_bt.yaml` |
+| Classical PD 제어기 (선택) | `src/control/classical_controller.py` |
+| Tactical Maneuver 인터페이스 | `src/behavior_tree/maneuvers.py` |
 | 테스트 스위트 | `test/test_*.py` (총 69 케이스) |

@@ -175,6 +175,31 @@ for f in test/test_*.py; do python $f; done
 
 ---
 
+## 저수준 제어 실험 — Classical PD 제어기 + BT output 재설계 (2026-06)
+
+> 모두 **선택적**이며 기본 동작(RNN 저수준 정책)은 그대로다. 후방호환 유지.
+
+### CT-1: Classical PD 제어기 (NN 우회)
+**배경**: 학습된 RNN이 G-load 균형을 위해 throttle을 자동 감속시켜 코너 스피드(~400 kts) 미달 평형에 갇히는 현상.
+
+**해결**: `AICOMBAT_CONTROLLER=classical` 설정 시 RNN을 우회하고 [`src/control/classical_controller.py`](../src/control/classical_controller.py) 의 stateless PD가 조종면을 직접 생성. BT 5×9×5 → 연속 setpoint(PITCH ±20° / BANK ±65° / SPEED 220~450 kts) 매핑 + 저역통과(α=0.85) 추종. 자세한 설명은 [제어기정리.md](제어기정리.md) Slide 3.
+
+### CT-2: Tactical Maneuver 출력 인터페이스 (Z-series)
+**배경**: 225개 이산 격자가 복잡 트리의 전술 의도를 격자화로 손실.
+
+**해결**: [`src/behavior_tree/maneuvers.py`](../src/behavior_tree/maneuvers.py) — BT 노드가 6타입(`BANK_HOLD`/`PITCH_HOLD`/`SPEED_HOLD`/`ALT_HOLD`/`ATA_TRACK`/`HEADING_HOLD`) 연속 maneuver 리스트를 `BaseAction.set_maneuver()` 로 출력. Classical 제어기가 weighted blend로 정밀 추종. `set_action()` 은 자동 변환되어 기존 트리도 동작.
+
+### CT-3: 신규 BT 노드
+- **액션**: `VerticalLead`(수직 우위 다이브), `OneCircleFight`/`TwoCircleFight`(rate fight), `OvershootAvoidance`(오버슛 회피).
+- **조건**: `AspectAngleAbove`/`AspectAngleBelow`(적 기동/비기동 판정), `AltGapAbove`/`AltGapBelow`(고도차 게이트), `ClosureRateAbove`/`ClosureRateBelow`.
+- 노드 카탈로그: [sdk/docs/NODE_REFERENCE.md](../sdk/docs/NODE_REFERENCE.md).
+
+### CT-4: red5 전술 트리 진화 + 평가 도구
+- red5(고급)를 Aspect Angle 기반 기동/비기동 표적 분리로 재구성(`ManeuveringTargetLead`/`NonManeuveringEnergyConvert`).
+- 평가 도구: [`scripts/redteam_round_robin.py`](../scripts/redteam_round_robin.py), [`scripts/redteam_multi_seed.py`](../scripts/redteam_multi_seed.py), [`scripts/eval_red5.py`](../scripts/eval_red5.py), [`scripts/measure_jsbsim_trim.py`](../scripts/measure_jsbsim_trim.py), [`scripts/test_classical_stability.py`](../scripts/test_classical_stability.py).
+
+---
+
 ## 변경된 핵심 파일
 
 | 파일 | 변경 유형 |
@@ -198,6 +223,12 @@ for f in test/test_*.py; do python $f; done
 | `src/match/runner_human_vs_bt.py` | inject 시그니처 변경 반영 |
 | `sdk/docs/GUIDE.md` | §1.2 판정·§1.2.1 BT 채널 정책 갱신 |
 | `docs/TOURNAMENT.md` | §10·§11 결승/감사 섹션 추가 |
+| `src/control/classical_controller.py` | 신규 (CT-1, Classical PD) |
+| `src/control/mid_level_autopilot.py` | 신규 (미들 레이어 PD, 실험) |
+| `src/behavior_tree/maneuvers.py` | 신규 (CT-2, Tactical Maneuver) |
+| `src/behavior_tree/nodes/actions.py` | VerticalLead·OneCircleFight·TwoCircleFight·OvershootAvoidance 등 추가, maneuver-native 재작성 |
+| `src/behavior_tree/nodes/conditions.py` | AspectAngleAbove/Below·AltGapAbove/Below 등 추가 |
+| `src/simulation/envs/JSBSim/tasks/singlecombat_task.py` | classical 제어 분기(`_use_classical_controller`) 추가 |
 
 ---
 
