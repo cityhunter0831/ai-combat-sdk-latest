@@ -1,0 +1,245 @@
+name: "cityhunter"
+version: "4.1-opt"
+description: "v4.1-opt — v4.1 구조 + optimizer 최적 파라미터 (34W-6D-0L / 40경기)"
+
+# ============================================================
+# v4.1-opt 최적 파라미터 (bt_optimizer_cityhunter.py Stage 3 결과)
+#
+# Stage 3: 40경기 34W-6D-0L
+#   vs simple:     10W-0D-0L
+#   vs aggressive:  8W-2D-0L
+#   vs golden:      6W-4D-0L
+#   vs ace:        10W-0D-0L
+#
+# v3.2-opt 대비 변경:
+#   - CircleFight (IsTwoCircle/IsOneCircle) 추가 [L6-1b]
+#   - HighYoYo (VelocityAbove + IsMerged) 추가 [L7-4]
+# ============================================================
+
+tree:
+  type: Selector
+  name: root
+
+  children:
+
+    # =====================================================
+    # [L1] 하드덱 회복 — 절대 최우선 생존
+    # =====================================================
+    - type: Sequence
+      name: L1_hard_deck
+      children:
+        - type: Condition
+          name: BelowHardDeck
+          params:
+            threshold_ft: 500
+        - type: Action
+          name: ClimbTo
+          params:
+            target_altitude_ft: 1571
+
+    # =====================================================
+    # [L2] 즉각 위협 — InEnemyWEZ 시 긴급 회피
+    # =====================================================
+    - type: Sequence
+      name: L2_immediate_threat
+      children:
+        - type: Condition
+          name: InEnemyWEZ
+          params:
+            max_distance_ft: 700.0
+            max_los_angle_deg: 5.7
+        - type: Action
+          name: BreakTurn
+
+    # =====================================================
+    # [L5] LagPreempt — 빠른 접근 차단
+    # =====================================================
+    - type: Sequence
+      name: L5_lag_preempt
+      children:
+        - type: Condition
+          name: ClosureRateAbove
+          params:
+            threshold_kts: 250.2
+        - type: Condition
+          name: DistanceBelow
+          params:
+            threshold_ft: 2431
+        - type: Action
+          name: LagPursuit
+
+    # =====================================================
+    # [L6] 공세 BFM
+    # ATABelow(54.7°): 공격 포지션 인식
+    # DistanceBelow(11674ft): 교전 거리
+    # =====================================================
+    - type: Sequence
+      name: L6_offensive_bfm
+      children:
+        - type: Condition
+          name: ATABelow
+          params:
+            threshold_deg: 54.7
+        - type: Condition
+          name: DistanceBelow
+          params:
+            threshold_ft: 11674
+
+        - type: Selector
+          name: L6_offensive_phases
+          children:
+
+            # L6-1: WEZ 진입 → PNAttack
+            - type: Sequence
+              name: L6_1_wez_attack
+              children:
+                - type: Condition
+                  name: DistanceBelow
+                  params:
+                    threshold_ft: 1772
+                - type: Condition
+                  name: ATABelow
+                  params:
+                    threshold_deg: 7.4
+                - type: Action
+                  name: PNAttack
+
+            # L6-1b: 근거리(<3243ft) 1/2써클 자동 판단 (BEM §4.4.11)
+            - type: Sequence
+              name: L6_1b_circle_fight
+              children:
+                - type: Condition
+                  name: DistanceBelow
+                  params:
+                    threshold_ft: 3243
+                - type: Selector
+                  name: L6_1b_circle_selector
+                  children:
+                    - type: Sequence
+                      name: L6_1b_two_circle
+                      children:
+                        - type: Condition
+                          name: IsTwoCircle
+                        - type: Action
+                          name: TwoCircleFight
+                    - type: Sequence
+                      name: L6_1b_one_circle
+                      children:
+                        - type: Condition
+                          name: IsOneCircle
+                        - type: Action
+                          name: OneCircleFight
+                    - type: Action
+                      name: TCFight
+
+            # L6-3: 중거리 공세 → LeadPursuit
+            - type: Sequence
+              name: L6_3_lead_pursuit
+              children:
+                - type: Condition
+                  name: DistanceBelow
+                  params:
+                    threshold_ft: 11674
+                - type: Action
+                  name: LeadPursuit
+
+    # =====================================================
+    # [L7] 수세 BFM
+    # UnderThreat(107.5°): 위협각
+    # DistanceBelow(2229ft): 근접 위협
+    # =====================================================
+    - type: Sequence
+      name: L7_defensive_bfm
+      children:
+        - type: Condition
+          name: UnderThreat
+          params:
+            aa_threshold_deg: 107.5
+        - type: Condition
+          name: DistanceBelow
+          params:
+            threshold_ft: 2229
+
+        - type: Selector
+          name: L7_defensive_phases
+          children:
+
+            # L7-1: 심각한 위협(aa>132°) → BreakTurn
+            - type: Sequence
+              name: L7_1_break_turn
+              children:
+                - type: Condition
+                  name: UnderThreat
+                  params:
+                    aa_threshold_deg: 132.0
+                - type: Action
+                  name: BreakTurn
+
+            # L7-2: 일반 위협(aa>60°) → DefensiveManeuver
+            - type: Sequence
+              name: L7_2_def_maneuver
+              children:
+                - type: Condition
+                  name: UnderThreat
+                  params:
+                    aa_threshold_deg: 60.0
+                - type: Action
+                  name: DefensiveManeuver
+
+            # L7-3: 오버슈트 감지 → 역공격
+            - type: Sequence
+              name: L7_3_counterattack
+              children:
+                - type: Condition
+                  name: IsOvershootRisk
+                - type: Action
+                  name: CounterattackOnOvershoot
+
+            # L7-4: 속도 과잉 + 근접 → HighYoYo (BEM §4.4 에너지 전환)
+            - type: Sequence
+              name: L7_4_high_yoyo
+              children:
+                - type: Condition
+                  name: VelocityAbove
+                  params:
+                    min_velocity_kts: 533.7
+                - type: Condition
+                  name: IsMerged
+                  params:
+                    merge_threshold_ft: 1992
+                - type: Action
+                  name: HighYoYo
+
+    # =====================================================
+    # [L8] 접근/중립 BFM — 조건 없는 catch-all
+    # =====================================================
+    - type: Sequence
+      name: L8_approach_bfm
+      children:
+        - type: Selector
+          name: L8_approach_phases
+          children:
+
+            # L8-1: 근거리(<3709ft) → PNPursuit
+            - type: Sequence
+              name: L8_1_close_fight
+              children:
+                - type: Condition
+                  name: DistanceBelow
+                  params:
+                    threshold_ft: 3709
+                - type: Action
+                  name: PNPursuit
+
+            # L8-2: 원거리 → PNPursuit fallback
+            - type: Sequence
+              name: L8_2_pn_pursuit
+              children:
+                - type: Action
+                  name: PNPursuit
+
+    # =====================================================
+    # [L9] Pursue fallback — 최후 수단
+    # =====================================================
+    - type: Action
+      name: Pursue
