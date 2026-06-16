@@ -1,0 +1,68 @@
+name: "beat_viper1"
+description: "Viper1의 약점인 오버슈트와 근거리 대응을 공략하는 에이전트"
+version: "1.1.0"
+
+tree:
+  type: Selector
+  children:
+    # 1. Hard Deck 회피 (최우선 생존)
+    - type: Sequence
+      name: HardDeckAvoidance
+      children:
+        - type: Condition
+          name: BelowHardDeck
+          params:
+            threshold_ft: 2000
+        - type: Action
+          name: ClimbTo
+          params:
+            target_altitude_ft: 4000
+
+    # 2. 사정거리 내 사격 (Gun WEZ 조건 완화로 적극적 타격)
+    - type: Sequence
+      name: GunEngagement
+      children:
+        - type: Condition
+          name: DistanceBelow
+          params:
+            threshold_ft: 3000
+        - type: Condition
+          name: DistanceAbove
+          params:
+            threshold_ft: 500
+        - type: Condition
+          name: ATABelow
+          params:
+            threshold_deg: 10.0
+        - type: Action
+          name: GunAttack
+
+    # 3. 근접전 오버슈트 방지 및 에너지 확보 (Viper1의 약점 공략)
+    - type: Sequence
+      name: AntiOvershoot
+      children:
+        - type: Condition
+          name: DistanceBelow
+          params:
+            threshold_ft: 5000
+        - type: Condition
+          name: ATAAbove
+          params:
+            threshold_deg: 45.0
+        - type: Action
+          name: HighYoYo
+
+    # 4. 근거리 압박 유지 (5000ft 이내에서 Viper1을 혼란스럽게 함)
+    - type: Sequence
+      name: CloseCombatPressure
+      children:
+        - type: Condition
+          name: DistanceBelow
+          params:
+            threshold_ft: 5000
+        - type: Action
+          name: LeadPursuit
+
+    # 5. 원거리 기본 추적
+    - type: Action
+      name: Pursue
